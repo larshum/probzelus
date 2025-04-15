@@ -8,34 +8,37 @@
 #  - Add option `-e DISPLAY=host.docker.internal:0` to `docker run`
 ############################################################
 
-FROM ocaml/opam2:4.10
-USER opam
+FROM ocaml/opam:ubuntu-24.04-opam
+
+SHELL ["/bin/bash", "-c"]
 
 ##################### PREREQUISITES ########################
 
 RUN sudo apt-get -y update \
-    && sudo apt-get -y install \ 
-        m4 wget unzip aspcud libshp-dev libplplot-dev gfortran pkg-config git \
-        libopenblas-dev liblapacke-dev time
-    
-###################### INSTALL OWL #########################
- 
-ENV OWLPATH /home/opam/owl   
+ && sudo apt-get -y install m4 wget unzip aspcud libshp-dev libplplot-dev gfortran pkg-config git libopenblas-dev liblapacke-dev time
+
+####################### INSTALL OWL #########################
+
 WORKDIR /home/opam/opam-repository
-RUN git pull --quiet origin master \
-    && opam update -q \
-    && opam install -y graphics owl owl-top owl-plplot zelus mtime csv \
-    && echo "#require \"owl-top\";; open Owl;;" >> /home/opam/.ocamlinit \
-    && echo 'eval $(opam env)' >> /home/opam/.bashrc
+RUN opam switch create probzelus ocaml-base-compiler.5.3.0 \
+ && opam switch probzelus \
+ && opam update \
+ && opam install -y graphics owl owl-top owl-plplot zelus mtime csv ppx_deriving \
+ && echo 'eval $(opam env)' >> /home/opam/.bashrc
 
 ####################### COPY FILES #########################
 
 RUN mkdir -p /home/opam/probzelus
 COPY --chown=opam . /home/opam/probzelus
 
-
-#################### INSTALL PROBZELUS #####################
+###################### INSTALL PROBZELUS #####################
 
 WORKDIR /home/opam/probzelus
-RUN opam pin -k path -y zelus-owl \
-    && opam pin -k path -y probzelus
+RUN eval $(opam env) \
+ && opam pin -y -k path -n zelus-libs \
+ && opam install -y zelus-owl zelus-owl-plplot zelus-io \
+ && opam pin -y -k path -n probzelus \
+ && make -C probzelus \
+ && opam install -y probzelus
+
+WORKDIR /home/opam
